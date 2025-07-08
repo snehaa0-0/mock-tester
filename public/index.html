@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Test Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+            transition: all 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 1.1em;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f9f9f9;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .test-container {
+            display: none;
+        }
+
+        .question-card {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .question-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .question-number {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .question-text {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .options {
+            display: grid;
+            gap: 12px;
+        }
+
+        .option {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .option:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .option.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #667eea;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            z-index: 1000;
+        }
+
+        .timer.warning {
+            background: #ff6b6b;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .results {
+            display: none;
+            text-align: center;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+
+        .score {
+            font-size: 3em;
+            color: #667eea;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .score-text {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 30px;
+        }
+
+        .restart-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .restart-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #c62828;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .timer {
+                position: relative;
+                top: 0;
+                right: 0;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Mock Test Generator</h1>
+        
+        <div id="setup-form">
+            <div class="form-group">
+                <label for="topic">Test Topic:</label>
+                <input type="text" id="topic" placeholder="e.g., JavaScript, Biology, History" required>
+            </div>
+
+            <div class="form-group">
+                <label for="difficulty">Difficulty Level:</label>
+                <select id="difficulty" required>
+                    <option value="">Select difficulty</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="numQuestions">Number of Questions:</label>
+                <select id="numQuestions" required>
+                    <option value="">Select number</option>
+                    <option value="5">5 Questions</option>
+                    <option value="10">10 Questions</option>
+                    <option value="15">15 Questions</option>
+                    <option value="20">20 Questions</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="timeLimit">Time Limit (minutes):</label>
+                <select id="timeLimit" required>
+                    <option value="">Select time</option>
+                    <option value="5">5 minutes</option>
+                    <option value="10">10 minutes</option>
+                    <option value="15">15 minutes</option>
+                    <option value="20">20 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="45">45 minutes</option>
+                    <option value="60">60 minutes</option>
+                </select>
+            </div>
+
+            <button class="btn" onclick="generateTest()">Generate Test</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Generating your test questions...</p>
+        </div>
+
+        <div class="test-container" id="testContainer">
+            <div class="timer" id="timer">Time: 00:00</div>
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+            </div>
+            <div id="questionsContainer"></div>
+            <button class="btn" onclick="submitTest()">Submit Test</button>
+        </div>
+
+        <div class="results" id="results">
+            <div class="score" id="score">0%</div>
+            <div class="score-text" id="scoreText">Great job!</div>
+            <button class="restart-btn" onclick="restartTest()">Take Another Test</button>
+        </div>
+    </div>
+
+    <script>
+        let questions = [];
+        let currentAnswers = {};
+        let timeRemaining = 0;
+        let timerInterval;
+
+        async function generateTest() {
+            const topic = document.getElementById('topic').value;
+            const difficulty = document.getElementById('difficulty').value;
+            const numQuestions = parseInt(document.getElementById('numQuestions').value);
+            const timeLimit = parseInt(document.getElementById('timeLimit').value);
+
+            if (!topic || !difficulty || !numQuestions || !timeLimit) {
+                showError('Please fill in all fields');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/api/generate-test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        topic,
+                        difficulty,
+                        numQuestions
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to generate test');
+                }
+
+                const data = await response.json();
+                questions = data.questions;
+
+                // Start the test
+                startTest(timeLimit);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message || 'Failed to generate test questions');
+            }
+            
+            showLoading(false);
+        }
+
+        function startTest(timeLimit) {
+            document.getElementById('setup-form').style.display = 'none';
+            document.getElementById('testContainer').style.display = 'block';
+            
+            // Initialize timer
+            timeRemaining = timeLimit * 60;
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            // Render questions
+            renderQuestions();
+            
+            // Initialize progress
+            updateProgress();
+        }
+
+        function renderQuestions() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+
+            questions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-card';
+                questionDiv.innerHTML = `
+                    <div class="question-number">Question ${index + 1} of ${questions.length}</div>
+                    <div class="question-text">${q.question}</div>
+                    <div class="options">
+                        ${q.options.map((option, optIndex) => `
+                            <div class="option" onclick="selectAnswer(${index}, '${String.fromCharCode(65 + optIndex)}')">
+                                ${String.fromCharCode(65 + optIndex)}. ${option}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(questionDiv);
+            });
+        }
+
+        function selectAnswer(questionIndex, answer) {
+            currentAnswers[questionIndex] = answer;
+            
+            // Update UI
+            const questionCard = document.querySelectorAll('.question-card')[questionIndex];
+            const options = questionCard.querySelectorAll('.option');
+            
+            options.forEach(option => option.classList.remove('selected'));
+            options[answer.charCodeAt(0) - 65].classList.add('selected');
+            
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const answered = Object.keys(currentAnswers).length;
+            const total = questions.length;
+            const percentage = (answered / total) * 100;
+            
+            document.getElementById('progress').style.width = percentage + '%';
+        }
+
+        function updateTimer() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            
+            document.getElementById('timer').textContent = 
+                `Time: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (timeRemaining <= 60) {
+                document.getElementById('timer').classList.add('warning');
+            }
+            
+            if (timeRemaining <= 0) {
+                submitTest();
+                return;
+            }
+            
+            timeRemaining--;
+        }
+
+        function submitTest() {
+            clearInterval(timerInterval);
+            
+            // Calculate score
+            let correct = 0;
+            questions.forEach((q, index) => {
+                if (currentAnswers[index] === q.correct) {
+                    correct++;
+                }
+            });
+            
+            const percentage = Math.round((correct / questions.length) * 100);
+            
+            // Show results
+            document.getElementById('testContainer').style.display = 'none';
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('score').textContent = percentage + '%';
+            document.getElementById('scoreText').textContent = 
+                `You got ${correct} out of ${questions.length} questions correct!`;
+            
+            // Remove timer
+            const timer = document.getElementById('timer');
+            if (timer) timer.style.display = 'none';
+        }
+
+        function restartTest() {
+            // Reset everything
+            questions = [];
+            currentAnswers = {};
+            timeRemaining = 0;
+            clearInterval(timerInterval);
+            
+            // Show setup form
+            document.getElementById('setup-form').style.display = 'block';
+            document.getElementById('testContainer').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+            
+            // Reset timer display
+            const timer = document.getElementById('timer');
+            if (timer) {
+                timer.style.display = 'block';
+                timer.classList.remove('warning');
+            }
+            
+            // Clear form
+            document.getElementById('topic').value = '';
+            document.getElementById('difficulty').value = '';
+            document.getElementById('numQuestions').value = '';
+            document.getElementById('timeLimit').value = '';
+        }
+
+        function showError(message) {
+            // Remove existing error
+            const existingError = document.querySelector('.error');
+            if (existingError) existingError.remove();
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            
+            document.getElementById('setup-form').appendChild(errorDiv);
+            
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.querySelector('.btn').disabled = show;
+        }
+    </script>
+</body>
+</html>
