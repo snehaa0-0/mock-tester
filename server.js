@@ -3,25 +3,33 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 require('dotenv').config();
 
-console.log("Loaded API key:", process.env.GEMINI_API_KEY);
+console.log("Loaded API key:", process.env.GEMINI_API_KEY ? "FOUND" : "NOT FOUND");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const cache = {};
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Get API key
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-if (!GEMINI_API_KEY) {
-    console.error('GEMINI_API_KEY environment variable is required');
-    process.exit(1);
+async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                if (response.status === 429) await new Promise(r => setTimeout(r, 2000));
+                throw new Error(`API Error: ${response.statusText} (${response.status})`);
+            }
+            return await response.json();
+        } catch (err) {
+            console.log(`Attempt ${i + 1} failed: ${err.message}. Retrying...`);
+            if (i === retries - 1) throw err;
+            await new Promise(res => setTimeout(res, delay));
+        }
+    }
 }
 
-// Test Generation Endpoint
 app.post('/api/generate-test', async (req, res) => {
     try {
         const { topic, difficulty, numQuestions } = req.body;
@@ -30,73 +38,64 @@ app.post('/api/generate-test', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        if (numQuestions < 1 || numQuestions > 50) {
-            return res.status(400).json({ error: 'Number of questions must be between 1 and 50' });
+        const cacheKey = `${topic}-${difficulty}-${numQuestions}`.toLowerCase();
+        if (cache[cacheKey]) {
+            console.log(`Serving ${cacheKey} from CACHE`);
+            return res.json({ questions: cache[cacheKey] });
         }
 
-        const prompt = `Generate ${numQuestions} multiple choice questions about ${topic} at ${difficulty} level. 
-        Format your response as a JSON array where each question object has:
-        - question: the question text
-        - options: array of 4 possible answers (A, B, C, D)
-        - correct: the correct answer (A, B, C, or D)
-        - explanation: brief explanation of why the answer is correct
-        Return only the JSON array, no other text.`;
+        const SYSTEM_INSTRUCTION = `
+        You are an API that generates quiz questions.
+        Output strictly in valid JSON format.
+        Structure: [ { "question": "...", "options": ["A", "B", "C", "D"], "correct": "A", "explanation": "..." } ]
+        Do NOT output markdown backticks. Return ONLY raw JSON.
+        `;
 
-        console.log("Sending prompt to Gemini:");
-        console.log(prompt);
+        const userPrompt = `Generate ${numQuestions} multiple choice questions about ${topic} at ${difficulty} level.`;
+        console.log(`Generating: ${topic} (${difficulty})`);
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}
-`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }]
-            })
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Gemini API error response:", errorText);
-            throw new Error(`API request failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("Raw API response:", JSON.stringify(data, null, 2));
+        const data = await fetchWithRetry(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: `${SYSTEM_INSTRUCTION}\n\n${userPrompt}` }]
+                    }]
+                })
+            }
+        );
 
         const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!generatedText) {
-            throw new Error('No generated text returned from Gemini');
+            throw new Error('No text returned from Gemini');
         }
 
-        const jsonText = generatedText.replace(/```json\n?|\n?```/g, '').trim();
-        let questions;
+        const jsonText = generatedText
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .trim();
 
+        let questions;
         try {
             questions = JSON.parse(jsonText);
         } catch (parseErr) {
-            console.error("JSON parsing failed:", parseErr);
-            console.error("Returned text was:", jsonText);
-            throw new Error('Failed to parse generated JSON');
+            console.error("JSON Parsing failed. Raw Text:", jsonText);
+            throw new Error('AI generated invalid JSON. Please try again.');
         }
 
-        if (!Array.isArray(questions) || questions.length === 0) {
-            throw new Error('Invalid or empty question array');
-        }
+        cache[cacheKey] = questions;
 
         res.json({ questions });
 
     } catch (error) {
-        console.error('Error generating test:', error.message);
-        res.status(500).json({ error: 'Failed to generate test questions' });
+        console.error('Server Error:', error.message);
+        res.status(500).json({ error: 'Failed to generate test questions. Please try again.' });
     }
 });
 
-// Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
