@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Test Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-brand">🚀 MockTester AI</div>
+        <div class="nav-links">
+            <span id="user-display" style="font-weight:bold; color:#555;">Hi, User</span>
+            <a href="results.html" class="history-btn">📜 History</a>
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>🎯 Create New Test</h1>
+        
+        <div id="setup-form">
+            <div class="form-group">
+                <label>Test Topic:</label>
+                <input type="text" id="topic" placeholder="e.g., JavaScript, Biology, History" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Difficulty:</label>
+                <select id="difficulty">
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Questions:</label>
+                <select id="numQuestions">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                </select>
+            </div>
+
+            <button class="btn" id="generate-btn" onclick="generateTest()">✨ Generate Test</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loading-text">AI is generating your test...</p>
+        </div>
+
+        <div class="test-container" id="testContainer">
+            <div id="questionsContainer"></div>
+            <button class="btn" id="submit-btn" onclick="submitTest()">✅ Submit Answers</button>
+        </div>
+
+        <div class="results" id="results">
+            <div class="score" id="score">0%</div>
+            <p id="scoreText" class="score-text"></p>
+            <button class="btn" onclick="window.location.reload()">Take Another Test</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

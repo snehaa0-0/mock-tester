@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Test History - MockTester AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2rem;
+        }
+
+        #user-greeting {
+            color: #667eea;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+        
+        .logout-btn { 
+            background-color: #ef4444; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        .logout-btn:hover {
+            background-color: #dc2626;
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            background: white; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th, td { 
+            padding: 15px; 
+            text-align: left; 
+            border-bottom: 1px solid #e5e7eb; 
+        }
+        
+        th { 
+            background-color: #667eea; 
+            color: white;
+            font-weight: 600;
+        }
+        
+        tr:hover { 
+            background-color: #f9fafb; 
+        }
+        
+        .score-badge { 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            color: white; 
+            font-weight: bold; 
+            font-size: 0.9em;
+            display: inline-block;
+        }
+        
+        .pass { 
+            background-color: #10b981; 
+        }
+        
+        .fail { 
+            background-color: #ef4444; 
+        }
+        
+        .back-link { 
+            display: inline-block; 
+            margin-top: 30px; 
+            padding: 12px 24px;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        .back-link:hover {
+            background-color: #5568d3;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>📜 Test History</h1>
+                <h3 id="user-greeting">Loading...</h3>
+            </div>
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
+        
+        <div id="table-wrapper">
+            <table id="results-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Topic</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body">
+                    <tr>
+                        <td colspan="4" style="text-align:center;">
+                            <div class="spinner" style="margin: 20px auto;"></div>
+                            Loading your test history...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <a href="dashboard.html" class="back-link">← Back to Dashboard</a>
+    </div>
+
+    <script>
+        // Check authentication
+        const username = localStorage.getItem('mockTestUser');
+        if (!username) {
+            window.location.href = 'index.html';
+        }
+
+        document.getElementById('user-greeting').innerText = `Welcome back, ${username}!`;
+
+        // Load test history
+        async function loadHistory() {
+            try {
+                const response = await fetch(`http://localhost:3000/api/results?username=${username}`);
+                const results = await response.json();
+
+                const tbody = document.getElementById('results-body');
+                tbody.innerHTML = '';
+
+                if (results.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4">
+                                <div class="empty-state">
+                                    <h3>📭 No Tests Yet</h3>
+                                    <p>You haven't taken any tests yet. Time to get started!</p>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                results.forEach(r => {
+                    const percentage = Math.round((r.score / r.total) * 100);
+                    const badgeClass = percentage >= 60 ? 'pass' : 'fail';
+                    const statusText = percentage >= 60 ? '✅ Passed' : '📚 Review';
+
+                    const row = `
+                        <tr>
+                            <td>${r.date}</td>
+                            <td><strong>${r.topic}</strong></td>
+                            <td><strong>${r.score} / ${r.total}</strong> (${percentage}%)</td>
+                            <td><span class="score-badge ${badgeClass}">${statusText}</span></td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+
+            } catch (err) {
+                console.error("Error loading history:", err);
+                const tbody = document.getElementById('results-body');
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align:center; color: #ef4444;">
+                            ❌ Error loading test history. Please try again.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('mockTestUser');
+            window.location.href = 'index.html';
+        }
+
+        // Load data on page load
+        loadHistory();
+    </script>
+</body>
+</html>
