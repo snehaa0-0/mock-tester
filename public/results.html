@@ -126,6 +126,20 @@
             margin-bottom: 10px;
         }
 
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
@@ -176,6 +190,19 @@
     </div>
 
     <script>
+        // ==========================================
+        // DYNAMIC API CONFIGURATION
+        // ==========================================
+        let API_URL = '';
+        
+        if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+            API_URL = 'http://127.0.0.1:3000';
+            console.log('🏠 Running Locally. Connecting to:', API_URL);
+        } else {
+            API_URL = '';
+            console.log('☁️ Running on Cloud. Using relative paths.');
+        }
+
         // Check authentication
         const username = localStorage.getItem('mockTestUser');
         if (!username) {
@@ -187,7 +214,7 @@
         // Load test history
         async function loadHistory() {
             try {
-                const response = await fetch(`http://localhost:3000/api/results?username=${username}`);
+                const response = await fetch(`${API_URL}/api/results?username=${username}`);
                 const results = await response.json();
 
                 const tbody = document.getElementById('results-body');
