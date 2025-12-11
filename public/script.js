@@ -1,19 +1,31 @@
 // ==========================================
-// 1. SETUP
+// 1. DYNAMIC API CONFIGURATION
 // ==========================================
 
-// Connect ONLY to local Python server
-const API_URL = 'http://127.0.0.1:3000';
+let API_URL = '';
 
-console.log('🔗 Connecting to Local Server:', API_URL);
+// Check if we are running locally (Live Server or opening HTML file)
+if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+    // Connect to the local Python server
+    API_URL = 'http://127.0.0.1:3000';
+    console.log('🏠 Running Locally. Connecting to:', API_URL);
+} else {
+    // Running on Render!
+    // We use an empty string to use relative paths (e.g., "/api/login")
+    API_URL = ''; 
+    console.log('☁️ Running on Cloud. Using relative paths.');
+}
 
-// Check Login
+// Check Authentication
 const currentUser = localStorage.getItem('mockTestUser');
-if (!currentUser) window.location.href = 'index.html';
+if (!currentUser) {
+    window.location.href = 'index.html'; 
+}
 
-// Display User
 const userDisplay = document.getElementById('user-display');
-if (userDisplay) userDisplay.innerText = `Hi, ${currentUser}`;
+if (userDisplay) {
+    userDisplay.innerText = `Hi, ${currentUser}`;
+}
 
 function logout() {
     localStorage.removeItem('mockTestUser');
@@ -21,43 +33,49 @@ function logout() {
 }
 
 // ==========================================
-// 2. GENERATE & TAKE TEST
+// 2. TEST GENERATION
 // ==========================================
 
 let currentQuestions = [];
 
 async function generateTest() {
-    const topic = document.getElementById('topic').value;
+    const topic = document.getElementById('topic').value.trim();
     const difficulty = document.getElementById('difficulty').value;
     const numQuestions = document.getElementById('numQuestions').value;
 
-    if (!topic) return alert("Enter a topic!");
+    if (!topic) {
+        alert("Please enter a topic!");
+        return;
+    }
 
     // UI Updates
     document.getElementById('setup-form').style.display = 'none';
     document.getElementById('loading').style.display = 'block';
 
     try {
-        const res = await fetch(`${API_URL}/api/generate-test`, {
+        const response = await fetch(`${API_URL}/api/generate-test`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ topic, difficulty, numQuestions })
         });
 
-        const data = await res.json();
+        const data = await response.json();
         
         if (data.questions) {
             currentQuestions = data.questions;
             displayQuiz(data.questions);
+            
             document.getElementById('loading').style.display = 'none';
             document.getElementById('testContainer').style.display = 'block';
         } else {
-            throw new Error(data.error || 'No questions returned');
+            throw new Error(data.error || 'Failed to get questions');
         }
 
     } catch (err) {
         console.error(err);
-        alert("Failed to generate test. Ensure server.py is running!");
+        alert("Error generating test. Check console for details.");
+        
+        // Reset UI
         document.getElementById('loading').style.display = 'none';
         document.getElementById('setup-form').style.display = 'block';
     }
@@ -65,13 +83,15 @@ async function generateTest() {
 
 function displayQuiz(questions) {
     const container = document.getElementById('questionsContainer');
-    container.innerHTML = questions.map((q, i) => `
+    
+    container.innerHTML = questions.map((q, index) => `
         <div class="question-card">
-            <p><strong>Q${i + 1}:</strong> ${q.question}</p>
+            <p class="question-text"><strong>Q${index + 1}:</strong> ${q.question}</p>
             <div class="options">
-                ${q.options.map(opt => `
+                ${q.options.map((opt) => `
                     <label class="option-label">
-                        <input type="radio" name="q${i}" value="${opt}"> ${opt}
+                        <input type="radio" name="q${index}" value="${opt}"> 
+                        ${opt}
                     </label>
                 `).join('')}
             </div>
@@ -86,40 +106,51 @@ function displayQuiz(questions) {
 async function submitTest() {
     let score = 0;
     
-    // Grade locally
-    const html = currentQuestions.map((q, i) => {
-        const selected = document.querySelector(`input[name="q${i}"]:checked`)?.value;
-        const correct = selected === q.correct;
-        if (correct) score++;
+    // Grading Logic
+    const gradedHTML = currentQuestions.map((q, index) => {
+        const selected = document.querySelector(`input[name="q${index}"]:checked`)?.value;
+        const isCorrect = selected === q.correct;
         
-        const color = correct ? 'green' : 'red';
+        if (isCorrect) score++;
+
+        const color = isCorrect ? 'green' : 'red';
+        const status = isCorrect ? '✅ Correct' : `❌ Wrong (Answer: ${q.correct})`;
+
         return `
-            <div style="border: 1px solid ${color}; padding: 10px; margin: 10px 0;">
-                <p>Q${i+1}: ${q.question}</p>
-                <p>Your Answer: ${selected || 'None'} (${correct ? '✅' : '❌'})</p>
-                ${!correct ? `<p>Correct Answer: ${q.correct}</p>` : ''}
-                <p><em>${q.explanation}</em></p>
+            <div style="border: 1px solid ${color}; padding: 15px; margin: 10px 0; border-radius: 8px;">
+                <p><strong>Q${index+1}:</strong> ${q.question}</p>
+                <p><strong>You:</strong> ${selected || "Skipped"} &nbsp; | &nbsp; <strong>${status}</strong></p>
+                <p style="color: #666; font-size: 0.9em;"><em>💡 ${q.explanation}</em></p>
             </div>
         `;
     }).join('');
 
-    // Show Results
-    document.getElementById('testContainer').style.display = 'none';
+    // Update Results UI
     const resultsDiv = document.getElementById('results');
+    document.getElementById('testContainer').style.display = 'none';
     resultsDiv.style.display = 'block';
-    document.getElementById('scoreText').innerHTML = `You scored ${score}/${currentQuestions.length}<br>${html}`;
+    
+    document.getElementById('scoreText').innerHTML = `
+        <h3>You scored ${score} / ${currentQuestions.length}</h3>
+        ${gradedHTML}
+    `;
 
-    // Save to DB
-    await fetch(`${API_URL}/api/save-result`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            username: currentUser,
-            topic: document.getElementById('topic').value,
-            score,
-            total: currentQuestions.length
-        })
-    });
+    // Save to Database
+    try {
+        await fetch(`${API_URL}/api/save-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: currentUser,
+                topic: document.getElementById('topic').value,
+                score: score,
+                total: currentQuestions.length
+            })
+        });
+        console.log("Result saved.");
+    } catch (err) {
+        console.error("Failed to save result:", err);
+    }
 }
 
 function restartTest() {

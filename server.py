@@ -9,28 +9,29 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
-# 1. LOAD ENVIRONMENT VARIABLES
+# 1. Load Environment Variables (for Local usage)
 load_dotenv()
 
 app = Flask(__name__, static_folder='public')
 
-# 2. LOCALHOST CORS (Allows your frontend to talk to this server)
+# 2. CORS Configuration
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# 3. CONFIGURATION FROM .ENV
+# 3. Configuration
+
 PORT = int(os.getenv('PORT', 3000))
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
+# DATABASE CONFIGURATION
 DATABASE_URL = os.getenv('DATABASE_URL')
-
-# In-memory cache for questions
-cache = {}
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql://postgres:password@localhost:5432/mock_test"
 
 print("=" * 50)
-print("🚀 MOCK TEST BACKEND (LOCAL POSTGRES MODE)")
-print("=" * 50)
-print(f"✅ Loaded PORT: {PORT}")
-print(f"✅ Loaded GROQ KEY: {'Found' if GROQ_API_KEY else 'Missing'}")
-print(f"✅ Loaded DB URL: {'Found' if DATABASE_URL else 'Missing'}")
+print(f"🚀 SERVER STARTING on Port {PORT}")
+print(f"🌍 Mode: {'Production (Render)' if os.getenv('RENDER') else 'Local Development'}")
+print(f"🔑 Groq Key: {'✅ Found' if GROQ_API_KEY else '❌ Missing'}")
 print("=" * 50)
 
 # --- DATABASE CONNECTION ---
@@ -46,7 +47,7 @@ def get_db_connection():
 def init_database():
     conn = get_db_connection()
     if not conn:
-        print("⚠️  Cannot connect to Database. Check your .env DATABASE_URL.")
+        print("⚠️  Cannot connect to Database. Skipping init.")
         return
     
     try:
@@ -74,27 +75,29 @@ def init_database():
         """)
         
         conn.commit()
-        print("✅ Database tables active.")
+        print("✅ Database tables ready.")
     except Exception as e:
         print(f"❌ Database Init Error: {e}")
     finally:
         cursor.close()
         conn.close()
 
+# Run init on startup
 init_database()
 
-# --- ROUTES ---
-
+# --- SERVE STATIC FILES ---
+# This serves your React/HTML frontend from the 'public' folder
 @app.route('/')
 def serve_index():
     if os.path.exists(os.path.join('public', 'index.html')):
         return send_from_directory('public', 'index.html')
-    return "<h1>Server Running locally!</h1>"
+    return "<h1>Server is running!</h1><p>Frontend not found in /public</p>"
 
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory('public', path)
 
+# --- HEALTH CHECK ---
 @app.route('/health', methods=['GET'])
 def health_check():
     conn = get_db_connection()
@@ -102,7 +105,7 @@ def health_check():
     if conn: conn.close()
     return jsonify({'status': 'ok', 'database': status})
 
-# --- AUTH ---
+# --- AUTH ROUTES ---
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -148,7 +151,7 @@ def login():
     finally:
         conn.close()
 
-# --- RESULTS ---
+# --- RESULTS ROUTES ---
 
 @app.route('/api/save-result', methods=['POST'])
 def save_result():
@@ -189,14 +192,14 @@ def get_results():
 def generate_test():
     data = request.get_json()
     
-    # Fallback if no key
     if not GROQ_API_KEY:
+        # Fallback question if API Key is missing
         return jsonify({
             'questions': [{
-                "question": "What is 2+2 (Fallback)?", 
-                "options": ["3", "4", "5", "6"], 
-                "correct": "4", 
-                "explanation": "No API Key found in .env"
+                "question": "The API Key is missing. What should you do?", 
+                "options": ["Panic", "Add GROQ_API_KEY to .env", "Cry", "Sleep"], 
+                "correct": "Add GROQ_API_KEY to .env", 
+                "explanation": "You need to configure the environment variables."
             }]
         })
 
@@ -215,18 +218,21 @@ def generate_test():
         }
         
         response = requests.post('https://api.groq.com/openai/v1/chat/completions', json=payload, headers=headers)
+        
         if response.status_code == 200:
             content = response.json()['choices'][0]['message']['content']
+            # Clean up potential markdown formatting
             content = content.replace('```json', '').replace('```', '').strip()
             return jsonify({'questions': json.loads(content)})
         else:
-             return jsonify({'error': 'Groq API Error', 'details': response.text}), 500
+            return jsonify({'error': 'Groq API Error', 'details': response.text}), 500
 
     except Exception as e:
         print(f"API Error: {e}")
         return jsonify({'error': str(e)}), 500
 
+# --- STARTUP ---
 if __name__ == '__main__':
-    # LISTEN ON LOCALHOST ONLY
-    print(f"\n✅ Server running at http://127.0.0.1:{PORT}")
-    app.run(host='127.0.0.1', port=PORT, debug=True)
+    
+    print(f"✅ Server running at http://127.0.0.1:{PORT}")
+    app.run(host='0.0.0.0', port=PORT, debug=True)
