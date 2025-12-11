@@ -43,3 +43,6 @@ coverage/
 tmp/
 temp/
 *.tmp
+.env
+__pycache__/
+venv/
