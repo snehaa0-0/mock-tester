@@ -2,6 +2,9 @@
 
 An AI-powered mock test generator that creates customized multiple-choice questions using the Groq API. Users can take tests on any topic, receive instant feedback, and track their performance over time.
 
+Live Demo
+Try out the application here: https://mock-tester-f5up.onrender.com/
+The application is deployed and ready to use. Create an account, generate custom tests on any topic, and track your progress.
 ---
 
 ## Table of Contents
