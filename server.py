@@ -15,11 +15,9 @@ load_dotenv()
 app = Flask(__name__, static_folder='public')
 
 # 2. CORS Configuration
-
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # 3. Configuration
-
 PORT = int(os.getenv('PORT', 3000))
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
@@ -27,6 +25,10 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
     DATABASE_URL = "postgresql://postgres:password@localhost:5432/mock_test"
+
+# 🔧 FIX: Render uses postgres:// but psycopg2 needs postgresql://
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 print("=" * 50)
 print(f"🚀 SERVER STARTING on Port {PORT}")
@@ -85,8 +87,17 @@ def init_database():
 # Run init on startup
 init_database()
 
+# --- CACHE BUSTING FOR STATIC FILES ---
+@app.after_request
+def add_no_cache_headers(response):
+    """Prevent caching of static files"""
+    if request.path.endswith(('.js', '.css')):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 # --- SERVE STATIC FILES ---
-# This serves your React/HTML frontend from the 'public' folder
 @app.route('/')
 def serve_index():
     if os.path.exists(os.path.join('public', 'index.html')):
@@ -106,7 +117,6 @@ def health_check():
     return jsonify({'status': 'ok', 'database': status})
 
 # --- AUTH ROUTES ---
-
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -152,7 +162,6 @@ def login():
         conn.close()
 
 # --- RESULTS ROUTES ---
-
 @app.route('/api/save-result', methods=['POST'])
 def save_result():
     data = request.get_json()
@@ -187,7 +196,6 @@ def get_results():
         conn.close()
 
 # --- AI GENERATION ---
-
 @app.route('/api/generate-test', methods=['POST'])
 def generate_test():
     data = request.get_json()
@@ -208,11 +216,30 @@ def generate_test():
             'Authorization': f'Bearer {GROQ_API_KEY}',
             'Content-Type': 'application/json'
         }
+        
+        # 🔧 FIXED: Much more explicit system prompt
+        system_prompt = """You are a quiz generator. Generate questions in EXACTLY this JSON format with NO markdown:
+[
+  {
+    "question": "What is 2+2?",
+    "options": ["3", "4", "5", "6"],
+    "correct": "4",
+    "explanation": "2+2 equals 4 because..."
+  }
+]
+
+CRITICAL RULES:
+1. The "correct" field must contain the EXACT TEXT from one of the options
+2. Do NOT use letters (A, B, C, D) in the "correct" field
+3. Do NOT add any markdown formatting like ```json
+4. Return ONLY valid JSON array, nothing else
+5. Each question must have exactly 4 options"""
+
         payload = {
             'model': 'llama-3.1-8b-instant',
             'messages': [
-                {'role': 'system', 'content': 'Generate JSON array only. Format: [{"question": "...", "options": ["A","B","C","D"], "correct": "A", "explanation": "..."}]'},
-                {'role': 'user', 'content': f'Generate {data["numQuestions"]} multiple choice questions on {data["topic"]} ({data["difficulty"]}).'}
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': f'Generate {data["numQuestions"]} multiple choice questions about {data["topic"]} at {data["difficulty"]} difficulty level.'}
             ],
             'temperature': 0.3
         }
@@ -223,16 +250,32 @@ def generate_test():
             content = response.json()['choices'][0]['message']['content']
             # Clean up potential markdown formatting
             content = content.replace('```json', '').replace('```', '').strip()
-            return jsonify({'questions': json.loads(content)})
+            
+            # Parse and validate
+            questions = json.loads(content)
+            
+            # 🔧 VALIDATION: Ensure correct answer exists in options
+            for q in questions:
+                if q['correct'] not in q['options']:
+                    print(f"⚠️ Warning: Correct answer '{q['correct']}' not in options {q['options']}")
+                    # Try to match by first letter if it's just a letter
+                    if len(q['correct']) == 1 and q['correct'].upper() in 'ABCD':
+                        idx = ord(q['correct'].upper()) - ord('A')
+                        if idx < len(q['options']):
+                            q['correct'] = q['options'][idx]
+                            print(f"✅ Fixed to: {q['correct']}")
+            
+            print(f"✅ Generated {len(questions)} questions successfully")
+            return jsonify({'questions': questions})
         else:
+            print(f"❌ Groq API Error: {response.status_code}")
             return jsonify({'error': 'Groq API Error', 'details': response.text}), 500
 
     except Exception as e:
-        print(f"API Error: {e}")
+        print(f"❌ API Error: {e}")
         return jsonify({'error': str(e)}), 500
 
 # --- STARTUP ---
 if __name__ == '__main__':
-    
     print(f"✅ Server running at http://127.0.0.1:{PORT}")
     app.run(host='0.0.0.0', port=PORT, debug=True)
