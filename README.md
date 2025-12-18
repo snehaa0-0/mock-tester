@@ -136,7 +136,7 @@ echo "*.log" >> .gitignore
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/sneha0-0/mock-tester
+git clone https://github.com/snehaa0-0/mock-tester
 cd mock-test-generator
 ```
 
