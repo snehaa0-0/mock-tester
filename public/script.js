@@ -109,7 +109,10 @@ async function submitTest() {
     // Grading Logic
     const gradedHTML = currentQuestions.map((q, index) => {
         const selected = document.querySelector(`input[name="q${index}"]:checked`)?.value;
-        const isCorrect = selected === q.correct;
+        
+        // 🔧 FIX: Extract just the letter (A, B, C, D) from the full option text
+        const selectedLetter = selected ? selected.charAt(0) : null;
+        const isCorrect = selectedLetter === q.correct;
         
         if (isCorrect) score++;
 
